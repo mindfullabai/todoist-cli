@@ -9,7 +9,7 @@
     "url": "https://github.com/mindfullabai"
   },
   "bin": {
-    "todoist": "./dist/index.js"
+    "todoist": "dist/index.js"
   },
   "files": [
     "dist/",
