@@ -1,0 +1,35 @@
+{
+  "name": "@mindfullabai/todoist-cli",
+  "version": "1.0.0",
+  "description": "AI-native Todoist CLI. Self-describing for AI agents via --ai flag. More efficient than MCP (~90% fewer tokens).",
+  "type": "module",
+  "license": "MIT",
+  "author": {
+    "name": "MindfullabAI",
+    "url": "https://github.com/mindfullabai"
+  },
+  "bin": {
+    "todoist": "./dist/index.js"
+  },
+  "files": [
+    "dist/",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@doist/todoist-api-typescript": "^6.4.1",
+    "commander": "^13.0.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.3",
+    "@types/node": "^20.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
