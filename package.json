@@ -1,6 +1,6 @@
 {
   "name": "@mindfullabai/todoist-cli",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "AI-native Todoist CLI. Self-describing for AI agents via --ai flag. More efficient than MCP (~90% fewer tokens).",
   "type": "module",
   "license": "MIT",

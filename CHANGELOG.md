@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.0.1] - 2026-05-21
+
+### Fixed
+- `--version` was reporting `1.0.0` instead of `2.0.1`
+
 ## [2.0.0] - 2026-05-21
 
 ### Breaking Changes
