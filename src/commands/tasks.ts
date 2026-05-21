@@ -40,6 +40,22 @@ function buildTaskJson(task: Task, projectName?: string, reminder?: Reminder) {
   }
 }
 
+// Format Date|string|number completedAt to "YYYY-MM-DD HH:MM" in Europe/Rome
+function formatCompletedAt(value: unknown): string {
+  let d: Date
+  if (value instanceof Date) d = value
+  else if (typeof value === 'string' || typeof value === 'number') d = new Date(value)
+  else return String(value)
+  if (isNaN(d.getTime())) return String(value)
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Rome',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(d)
+  const get = (t: string) => parts.find(p => p.type === t)?.value ?? ''
+  return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}`
+}
+
 // Convert "2026-05-23 13:30" local datetime to UTC ISO8601 with Z suffix
 function parseLocalDatetime(input: string): string {
   const date = new Date(input)
@@ -460,11 +476,23 @@ export function registerCompletedCommand(program: Command, token?: string) {
         if (opts.json) {
           printJson(tasks)
         } else {
+          // Build projectId -> name map for text rendering (skip if filtered: known already)
+          let projectMap: Map<string, string> | undefined
+          if (!projectName) {
+            const projects = await getAllProjects(client)
+            projectMap = new Map(projects.map(p => [p.id, p.name]))
+          }
+
           console.log(label)
           for (const task of tasks) {
-            const completedAt = (task as unknown as { completedAt?: string }).completedAt
-            const completedStr = completedAt ? ` [completed: ${completedAt.split('T')[0]}]` : ''
-            console.log(`- [${task.id}] ${task.content}${completedStr}`)
+            const raw = (task as unknown as { completedAt?: unknown }).completedAt
+            const completedStr = raw ? ` [completed: ${formatCompletedAt(raw)}]` : ''
+            const labels = (task as unknown as { labels?: string[] }).labels ?? []
+            const labelStr = labels.length > 0 ? ` @${labels.join(' @')}` : ''
+            const pid = (task as unknown as { projectId?: string }).projectId
+            const pname = projectName ?? (pid ? projectMap?.get(pid) : undefined)
+            const projectStr = pname ? ` (${pname})` : ''
+            console.log(`- [${task.id}] ${task.content}${labelStr}${projectStr}${completedStr}`)
           }
         }
       } catch (err) {

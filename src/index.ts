@@ -22,7 +22,7 @@ const program = new Command()
 
 program
   .name('todoist')
-  .version('2.0.1')
+  .version('2.0.2')
   .description(
     'AI-native Todoist CLI. Manage tasks and projects from the command line.\n\n' +
     'AI Agent? Run: todoist --ai (JSON schema) | --ai brief | --ai examples'
