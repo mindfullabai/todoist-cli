@@ -1,5 +1,5 @@
-import { TodoistApi } from '@doist/todoist-api-typescript'
-import type { Task, Project } from '@doist/todoist-api-typescript'
+import { TodoistApi } from '@doist/todoist-sdk'
+import type { Task, Project } from '@doist/todoist-sdk'
 
 let _client: TodoistApi | null = null
 
@@ -19,26 +19,17 @@ export function resetClient() {
   _client = null
 }
 
-// SDK v6 returns { results: T[], nextCursor: string|null } instead of T[]
-type PaginatedResponse<T> = { results: T[]; nextCursor?: string | null } | T[]
-
-export function extractResults<T>(res: PaginatedResponse<T>): T[] {
-  if (Array.isArray(res)) return res
-  return (res as { results: T[] }).results ?? []
-}
-
 export async function getAllProjects(client: TodoistApi): Promise<Project[]> {
-  const res = await client.getProjects() as PaginatedResponse<Project>
-  return extractResults(res)
+  const res = await client.getProjects()
+  return res.results
 }
 
 export async function getAllTasks(client: TodoistApi, params?: { projectId?: string }): Promise<Task[]> {
-  const res = await client.getTasks(params) as PaginatedResponse<Task>
-  return extractResults(res)
+  const res = await client.getTasks(params)
+  return res.results
 }
 
 export async function getTasksByFilter(client: TodoistApi, query: string): Promise<Task[]> {
-  const api = client as unknown as { getTasksByFilter: (p: { query: string }) => Promise<PaginatedResponse<Task>> }
-  const res = await api.getTasksByFilter({ query })
-  return extractResults(res)
+  const res = await client.getTasksByFilter({ query })
+  return res.results
 }

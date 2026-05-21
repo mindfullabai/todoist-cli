@@ -36,6 +36,18 @@ todoist task delete <id>
 todoist task reopen <id>
 ```
 
+### Reminders (Pro account required)
+```bash
+# Absolute reminder: push notification at exact datetime
+todoist task create "Call client" --due "2026-05-23 14:00" --reminder "2026-05-23 13:30"
+
+# Relative reminder: push notification N minutes before due
+todoist task create "Publish Onda Short" --due "2026-05-23 14:00" --reminder-before 30
+
+# JSON output includes reminder_id
+todoist task create "Meeting" --due "tomorrow 10:00" --reminder-before 15 --json
+```
+
 ### Completed Tasks
 ```bash
 todoist completed                          # Today

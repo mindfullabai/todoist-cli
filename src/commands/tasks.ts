@@ -1,7 +1,7 @@
 import { Command } from 'commander'
 import { getClient, getAllProjects, getAllTasks, getTasksByFilter } from '../lib/api.js'
 import { formatTask, printJson, printError } from '../lib/output.js'
-import type { Task, Project } from '@doist/todoist-api-typescript'
+import type { Task, Project, Reminder } from '@doist/todoist-sdk'
 
 // Fuzzy match: exact first, then case-insensitive, then partial
 function matchProject(projects: Project[], query: string): Project | null {
@@ -25,7 +25,7 @@ function matchProject(projects: Project[], query: string): Project | null {
   return null
 }
 
-function buildTaskJson(task: Task, projectName?: string) {
+function buildTaskJson(task: Task, projectName?: string, reminder?: Reminder) {
   return {
     id: task.id,
     content: task.content,
@@ -36,7 +36,17 @@ function buildTaskJson(task: Task, projectName?: string) {
     projectId: task.projectId,
     project: projectName,
     url: task.url,
+    ...(reminder ? { reminder_id: reminder.id } : {}),
   }
+}
+
+// Convert "2026-05-23 13:30" local datetime to UTC ISO8601 with Z suffix
+function parseLocalDatetime(input: string): string {
+  const date = new Date(input)
+  if (isNaN(date.getTime())) {
+    throw new Error(`Invalid datetime: "${input}". Use format "YYYY-MM-DD HH:MM" or ISO8601.`)
+  }
+  return date.toISOString()
 }
 
 export function registerTasksCommand(program: Command, token?: string) {
@@ -184,14 +194,22 @@ export function registerTaskCommand(program: Command, token?: string) {
     .option('--priority <n>', 'Priority 1-4 (4=urgent)', '4')
     .option('--labels <labels>', 'Comma-separated labels')
     .option('--description <text>', 'Task description')
+    .option('--reminder <datetime>', 'Absolute reminder datetime (e.g. "2026-05-23 13:30")')
+    .option('--reminder-before <minutes>', 'Relative reminder: N minutes before due date')
     .option('--json', 'Output JSON')
     .option('--token <token>', 'Todoist API token')
     .action(async (content: string, opts: {
       project?: string; projectId?: string; due?: string; priority?: string;
-      labels?: string; description?: string; json?: boolean; token?: string
+      labels?: string; description?: string; reminder?: string; reminderBefore?: string;
+      json?: boolean; token?: string
     }) => {
       const client = getClient(opts.token || token)
       try {
+        if (opts.reminder && opts.reminderBefore) {
+          printError('--reminder and --reminder-before are mutually exclusive')
+          process.exit(1)
+        }
+
         let projectId: string | undefined = opts.projectId
 
         if (opts.project && !projectId) {
@@ -213,10 +231,32 @@ export function registerTaskCommand(program: Command, token?: string) {
           description: opts.description,
         })
 
+        let reminder: Reminder | undefined
+
+        if (opts.reminder) {
+          const dueDatetime = parseLocalDatetime(opts.reminder)
+          reminder = await client.addReminder({
+            taskId: task.id,
+            reminderType: 'absolute',
+            due: { date: dueDatetime },
+          })
+        } else if (opts.reminderBefore) {
+          const minuteOffset = parseInt(opts.reminderBefore)
+          if (isNaN(minuteOffset) || minuteOffset <= 0) {
+            printError('--reminder-before must be a positive integer (minutes)')
+            process.exit(1)
+          }
+          reminder = await client.addReminder({
+            taskId: task.id,
+            minuteOffset,
+          })
+        }
+
         if (opts.json) {
-          printJson(buildTaskJson(task))
+          printJson(buildTaskJson(task, undefined, reminder))
         } else {
-          console.log(`Created: [${task.id}] ${task.content}`)
+          const reminderStr = reminder ? ` [reminder: ${reminder.id}]` : ''
+          console.log(`Created: [${task.id}] ${task.content}${reminderStr}`)
         }
       } catch (err) {
         printError(err instanceof Error ? err.message : String(err))
@@ -324,7 +364,7 @@ export function registerTaskCommand(program: Command, token?: string) {
           process.exit(1)
         }
 
-        await client.updateTask(id, { projectId })
+        await client.moveTask(id, { projectId })
         console.log(`Moved: ${id} -> project ${projectId}`)
       } catch (err) {
         printError(err instanceof Error ? err.message : String(err))
@@ -400,18 +440,11 @@ export function registerCompletedCommand(program: Command, token?: string) {
           projectName = found.name
         }
 
-        // SDK v6 uses getCompletedTasksByCompletionDate
-        const completedApi = client as unknown as {
-          getCompletedTasksByCompletionDate: (p: Record<string, unknown>) => Promise<{ items: Array<{ id: string; content: string; completedAt?: string; projectId?: string }> }>
-        }
-        const params: Record<string, unknown> = {
+        const result = await client.getCompletedTasksByCompletionDate({
           since: `${since}T00:00:00.000Z`,
           until: `${until}T23:59:59.000Z`,
-          limit: 200,
-        }
-        if (projectId) params.projectId = projectId
-
-        const result = await completedApi.getCompletedTasksByCompletionDate(params)
+          ...(projectId ? { projectId } : {}),
+        })
         const tasks = result.items ?? []
 
         if (tasks.length === 0) {
@@ -429,7 +462,7 @@ export function registerCompletedCommand(program: Command, token?: string) {
         } else {
           console.log(label)
           for (const task of tasks) {
-            const completedAt = task.completedAt
+            const completedAt = (task as unknown as { completedAt?: string }).completedAt
             const completedStr = completedAt ? ` [completed: ${completedAt.split('T')[0]}]` : ''
             console.log(`- [${task.id}] ${task.content}${completedStr}`)
           }
